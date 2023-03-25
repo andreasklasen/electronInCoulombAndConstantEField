@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Kugel in Kreisbewegung</title>
+	<style>
+		canvas {
+			border: 1px white;
+		}
+	</style>
+</head>
+<body>
+	<canvas id="myCanvas" width="1200" height="600"></canvas>
+
+	<input type="range" min="1" max="10" value="5" id="rangeSlider">
+	<input type="range" min="0" max="30" value="0" id="electricField">
+	
+	<script>
+		window.onload = function() {
+			var canvas = document.getElementById("myCanvas");
+			var ctx = canvas.getContext("2d");
+			var centerX = canvas.width/4;
+			var centerY = canvas.height/2;
+			var radius = 200; 
+			var angle = 0; // initial angle for the electron circulating around the proton
+			var speed = document.getElementById("rangeSlider").value; // slider for the speed of the simulation, NOT the speed of the charged particles
+			var delta=speed * 0.01; // time step
+			var x = centerX + radius * Math.cos(angle); // current x-position
+			var y = centerY + radius * Math.sin(angle); // current y-position
+			var xm1  = centerX + radius * Math.cos(angle-delta); // x-position a full delta time step in the past
+			var ym1  = centerY + radius * Math.sin(angle-delta); // x-position a full delta time step in the past
+			var xm12 = centerX + radius * Math.cos(angle-delta/2.0); // x-position half a delta time step in the past
+			var ym12 = centerY + radius * Math.sin(angle-delta/2.0); // y-position half a delta time step in the past
+			var vx = -radius * Math.sin(angle); // current velocity in x-direction
+			var vy =  radius * Math.cos(angle); // current velocity in y-direction
+			var vxm1  = -radius * Math.sin(angle-delta);
+			var vym1  =  radius * Math.cos(angle-delta);
+			var trail = [];
+			var gamma=40000.0; // strength of the coulomb interaction
+			var E= document.getElementById("electricField").value;
+			var rxy2=0.0; //distance between two chraged particles
+			var nEFL=0.0; // number of electric field lines
+			drawElectricField(E);
+
+			// drawing an electron at position xC and yC with radius eR
+			function drawElectron(xC,yC,eR) {
+				// Zeichnen des Elektrons in der Mitte des Kreises
+				ctx.beginPath();
+				ctx.arc(xC, yC, eR, 0, 2*Math.PI);
+				ctx.fillStyle = "blue";
+				ctx.fill();
+				ctx.beginPath();
+				ctx.moveTo(xC-eR/2, yC);
+				ctx.lineTo(xC+eR/2, yC);
+				ctx.lineWidth = 2;
+				ctx.strokeStyle = "lightblue";
+				ctx.stroke();
+			}
+
+			// drawing a positron at position xC and yC with radius eR
+			function drawProton(xC,yC,eR) {
+				// Zeichnen des Elektrons in der Mitte des Kreises
+				ctx.beginPath();
+				ctx.arc(xC, yC, eR, 0, 2*Math.PI);
+				ctx.fillStyle = "red";
+				ctx.fill();
+				ctx.beginPath();
+				ctx.moveTo(xC-eR/2, yC);
+				ctx.lineTo(xC+eR/2, yC);
+				ctx.moveTo(xC,yC-eR/2);
+				ctx.lineTo(xC,yC+eR/2);
+				ctx.lineWidth = 2;
+				ctx.strokeStyle = "rgba(255,150,150,1.0)";
+				ctx.stroke();
+			}
+
+			// drawing an arrow tip for the electric field
+			function canvas_arrow(context, fromx, fromy, tox, toy, r){
+   				var x_centerArrow = tox;
+    				var y_centerArrow = toy;
+
+   				var angleArrow;
+    				var xArrow;
+    				var yArrow;
+
+    				context.beginPath();
+
+    				angleArrow = Math.atan2(toy-fromy,tox-fromx)
+    				xArrow = r*Math.cos(angleArrow) + x_centerArrow;
+    				yArrow = r*Math.sin(angleArrow) + y_centerArrow;
+
+    				context.moveTo(xArrow, yArrow);
+
+    				angleArrow += (1/3)*(2*Math.PI)
+    				xArrow = r*Math.cos(angleArrow) + x_centerArrow;
+    				yArrow = r*Math.sin(angleArrow) + y_centerArrow;
+
+    				context.lineTo(xArrow, yArrow);
+
+    				angleArrow += (1/3)*(2*Math.PI)
+    				xArrow = r*Math.cos(angleArrow) + x_centerArrow;
+    				yArrow = r*Math.sin(angleArrow) + y_centerArrow;
+
+    				context.lineTo(xArrow, yArrow);
+
+				context.fillStyle = "rgba(10,10,10,0.5)";
+
+    				context.closePath();
+
+    				context.fill();
+			}
+
+			// drawing the electric field lines for an electric field of strength EFiel, the stronger the electric field is the more field lines are printed
+			function drawElectricField(EField) {
+			      if(document.getElementById("electricField").value==0){
+					nEFL=0;
+				}
+				else{  
+					nEFL=Math.round(document.getElementById("electricField").value);
+				
+					// Zeichnen des Elektrons in der Mitte des Kreises
+					for (var i = 0; i < nEFL; i++) {
+						ctx.beginPath();
+						ctx.moveTo(0, canvas.height/nEFL*(i+0.5));
+						ctx.lineTo(canvas.width, canvas.height/nEFL*(i+0.5));
+						ctx.lineWidth = 1;
+						ctx.strokeStyle = "rgba(10,10,10,0.5)";
+						ctx.stroke();
+				
+						canvas_arrow(ctx, canvas.width*0.007, canvas.height/nEFL*(i+0.5), canvas.width*0.0035, canvas.height/nEFL*(i+0.5), 5.0) ;
+					}
+				}
+			}
+
+			// draw the electron moving in the electric field of the proton and in the external variable electric field
+			function draw() {
+
+				ctx.clearRect(0, 0, canvas.width, canvas.height);	
+
+				drawProton(centerX,centerY,20);
+				drawElectricField(E);
+
+				// verlet integration for computing the next position of the electron
+				xm1=x;
+				ym1=y;
+				vxm1=vx;
+				vym1=vy;
+				xm12=xm1+delta/2.0*vxm1;
+				ym12=ym1+delta/2.0*vym1;
+				rxy2=Math.pow(xm12-centerX,2)+Math.pow(ym12-centerY,2);
+				vx=vxm1-delta*gamma*(xm12-centerX)/rxy2+delta*E;
+				vy=vym1-delta*gamma*(ym12-centerY)/rxy2;
+				x=xm12+delta/2.0*vx;
+				y=ym12+delta/2.0*vy;
+
+				// leaving a trail by adding another point to the trail
+				trail.push({x: x, y: y});
+
+				// drawing the trail behind the electron
+				for (var i = 0; i < trail.length; i++) {
+					var alpha = i/trail.length;
+					ctx.strokeStyle = "rgba(0, 0, 0, " + alpha + ")";
+					ctx.beginPath();
+					ctx.arc(trail[i].x, trail[i].y, 1, 0, 2*Math.PI);
+					ctx.stroke();
+				}
+
+				// removing the oldest trail part
+				if (trail.length > 100) {
+					trail.shift();
+				}
+
+				drawElectron(x,y,10);	
+				
+				delta = speed*0.01;
+				angle += delta;
+
+				requestAnimationFrame(draw);
+			}
+
+			draw();
+
+			// Aktualisieren der Geschwindigkeit beim Ändern des Schiebereglers
+			document.getElementById("rangeSlider").oninput = function() {
+				speed = this.value;
+			};
+
+			// elektrisches Feld aktualisieren, wenn der entsprechende Schieberegler betätigt wird
+			document.getElementById("electricField").oninput = function() {
+				E = this.value;
+			};
+		};
+	</script>
+</body>
+</html>
